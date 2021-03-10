@@ -3,7 +3,7 @@ import pymech.exadata as exa
 import meshtools_split as msts
 import splitmesh_fun as smf
 
-path = './'
+path = '../examples/'
 meshI = 'in_mesh_2d.rea'
 meshO = 'out_mesh_3d'
 
