@@ -3,7 +3,7 @@ import pymech.exadata as exdat
 import copy
 from pymech.log import logger
 #==============================================================================
-def extrude(mesh2D, z, n, bc1, bc2, fun  = '', Rlim = '', imesh_high = 0):
+def extrude(mesh2D, z, n, bc1, bc2, fun  = '', funpar = '', imesh_high = 0):
     """Extrudes a 2D mesh into a 3D one, following the pattern:
      _____ _____ _____ _____
     |     |     |     |     |
@@ -11,7 +11,7 @@ def extrude(mesh2D, z, n, bc1, bc2, fun  = '', Rlim = '', imesh_high = 0):
     |     |     |     |     |
     |_____|_____|_____|_____|
     |    /|\    |    /|\    |
-    |__ / | \ __|__ / | \ __| (fun (with parameter Rlim) should change change sign in the mid element)
+    |__ / | \ __|__ / | \ __| (fun (with parameter funpar) should change change sign in the mid element)
     |  |  |  |  |  |  |  |  | (half of the mid elements are also divided in 2 in (x,y)-plane)
     |__|__|__|__|__|__|__|__|
     |  |  |  |  |  |  |  |  |
@@ -34,8 +34,8 @@ def extrude(mesh2D, z, n, bc1, bc2, fun  = '', Rlim = '', imesh_high = 0):
          the boundary condition to use at the ends
     fun: function
          list of functions that define the splitting lines for different discretization meshes (default: empty, calls simple extrusion routine)
-    Rlim: float
-          list of parameters for functions that define the splitting lines for different discretization meshes (default: empty, for when Rlim is not needed inside fun)
+    funpar: list
+          list of parameters for functions that define the splitting lines for different discretization meshes (default: empty, for when funpar is not needed inside fun)
     imesh_high : int
                  index of fun that defines the mesh with higher discretization. Example: 0, is the most internal mesh; 1 is the second most internal mesh, etc (default: the most internal mesh, imesh_high=0)
 
@@ -64,11 +64,11 @@ def extrude(mesh2D, z, n, bc1, bc2, fun  = '', Rlim = '', imesh_high = 0):
     
     #Consistency checks: Functions that define the splitting lines
     nsplit=len(fun)
-    if len(Rlim) < nsplit:
-        print('Warning: Length of Rlim < lenght of fun. Completing with', (nsplit-len(Rlim)), 'zeros.')
-        Rlim[len(Rlim):nsplit]=[0.0]*(nsplit-len(Rlim))
-    elif len(Rlim) > nsplit:
-        print('Warning: Length of Rlim > lenght of fun. Ignoring', (len(Rlim)-nsplit), 'values.')
+    if len(funpar) < nsplit:
+        print('Warning: Length of funpar < lenght of fun. Completing with', (nsplit-len(funpar)), 'zeros.')
+        funpar[len(funpar):nsplit]=[0.0]*(nsplit-len(funpar))
+    elif len(funpar) > nsplit:
+        print('Warning: Length of funpar > lenght of fun. Ignoring', (len(funpar)-nsplit), 'values.')
     
     #Defining z positions for extrusion
     if all(v=='' for v in n) and not any(v=='' for v in z) and len(z)==2:
@@ -179,7 +179,7 @@ def extrude(mesh2D, z, n, bc1, bc2, fun  = '', Rlim = '', imesh_high = 0):
                 for j in range(2):
                     xvec[it] = mesh2D_ext.elem[iel].pos[0,0,j,i]
                     yvec[it] = mesh2D_ext.elem[iel].pos[1,0,j,i]
-                    rvec[it] = fun[k](xvec[it], yvec[it], Rlim[k])
+                    rvec[it] = fun[k](xvec[it], yvec[it], funpar[k])
                     it += 1
             if max(rvec) <= 0.0:
                 meshes2D[2*k].elem[iel_int] = copy.deepcopy(mesh2D_ext.elem[iel])
@@ -246,7 +246,7 @@ def extrude(mesh2D, z, n, bc1, bc2, fun  = '', Rlim = '', imesh_high = 0):
                 return -11
         
         meshes3D.append(extrude_z(meshes2D[2*k], zlist_local, bc1, bc2))
-        meshes3D.append(extrude_mid(meshes2D[2*k+1], zlist_mid, bc1, bc2, fun_local, Rlim[k]))
+        meshes3D.append(extrude_mid(meshes2D[2*k+1], zlist_mid, bc1, bc2, fun_local, funpar[k]))
         
         #print('Removing boundary condition E to improve merging time')
         for (iel, el) in enumerate(meshes3D[2*k].elem):
@@ -454,11 +454,11 @@ def extrude_z(mesh, z, bc1, bc2):
 
 
 #==============================================================================
-def extrude_mid(mesh, z, bc1, bc2, fun, Rlim = 0.0):
+def extrude_mid(mesh, z, bc1, bc2, fun, funpar = 0.0):
     """Extrudes the mid elments of the 2D mesh into a 3D one. Following the pattern:
      _____ _____ _____ _____ 
     |1   /|\   4|    /|\    |
-    |__ / | \ __|__ / | \ __| (fun (with parameter Rlim) should change change sign in the mid element)
+    |__ / | \ __|__ / | \ __| (fun (with parameter funpar) should change change sign in the mid element)
     |0 |2 |3 | 5|  |  |  |  | (half of the mid elements are also divided in 2 in (x,y)-plane)
     |__|__|__|__|__|__|__|__| (numbers in the figure indicate the indices (iel+0; iel+1; etc))
     
@@ -472,8 +472,8 @@ def extrude_mid(mesh, z, bc1, bc2, fun, Rlim = 0.0):
          the boundary condition to use at the ends
     fun : function
           function that define the splitting lines for different discretization meshes
-    Rlim : float
-           parameter for functions that define the splitting lines for different discretization meshes (default: zero, can be used for when Rlim is not needed inside fun)
+    funpar : not defined, depends on the function
+             parameter for functions that define the splitting lines for different discretization meshes (default: zero, can be used for when funpar is not needed inside fun)
 
     Suggestion: see function extrude_split to understand how to call extrude_mid
     """
@@ -539,7 +539,7 @@ def extrude_mid(mesh, z, bc1, bc2, fun, Rlim = 0.0):
                 for jj in range(2):
                     xvec[jj,ii] = mesh.elem[i].pos[0,0,jj,ii]
                     yvec[jj,ii] = mesh.elem[i].pos[1,0,jj,ii]
-                    rvec[jj,ii] = fun(xvec[jj,ii], yvec[jj,ii], Rlim)
+                    rvec[jj,ii] = fun(xvec[jj,ii], yvec[jj,ii], funpar)
                     if rvec[jj,ii] <= 0.0:
                         if (iindex_lo > 1):
                             logger.critical('Mid element not consistent. Criteria must divide elements with 2 points on each side.')

@@ -6,30 +6,7 @@ import splitmesh_fun as smf
 path = '../examples/'
 meshI = 'in_mesh_2d.rea'
 meshO = 'out_mesh_3d'
-
-#meshI = 'rot2.rea'
-#meshO = 'rot2_3d'
-
-z = [-1.0,1.0]
-n = [32]
-bc1='v'
-bc2='O'
-coord = [''] # x and y positions of the leading and trailing edge
-ble = 0.0 # sweep angle (degrees) at the leading edge (positive is converging for increasing z)
-bte = 0.0 # sweep angle (degrees) at the trailing edge (positive is converging for increasing z)
-
-imesh_high=1 #index of mesh with higher discretization. Example: for imesh_high=0, the mesh with higher discretization is the most internal mesh (for for imesh_high=1, it is the second most internal mesh)
-Rlim=[0.53, 1.25, 2.0, 3.6]
-
-fun_circ = lambda xpos, ypos, rlim: ((xpos**2+ypos**2)**0.5)/rlim - 1.0
-fun=[smf.fun_hexag, fun_circ, fun_circ, fun_circ]
-
 #meshI = 'boxmix.rea'
-#n = [4]
-#imesh_high=0
-#Rlim=[0.01]
-#fun_line = lambda xpos, ypos, rlim: ypos/rlim - 1.0
-#fun=[fun_line]
 
 ## defining paths to files
 fnameI = path + meshI
@@ -44,7 +21,39 @@ else:
     print('Assuming mesh has .rea format')
     mesh2D = ns.readrea(fnameI+'.rea')
 
-mesh3D = msts.extrude(mesh2D, z, n, bc1, bc2, fun, Rlim, imesh_high)
+#Input parameters
+z = [-1.0,1.0]
+n = [32]
+bc1='v'
+bc2='O'
+coord = [''] # x and y positions of the leading and trailing edge
+ble = 0.0 # sweep angle (degrees) at the leading edge (positive is converging for increasing z)
+bte = 0.0 # sweep angle (degrees) at the trailing edge (positive is converging for increasing z)
+
+imesh_high=1 #index of mesh with higher discretization. Example: for imesh_high=0, the mesh with higher discretization is the most internal mesh (for for imesh_high=1, it is the second most internal mesh)
+funpar=[0.53, 1.25, 2.0, 3.6]
+
+#fun_circ = lambda xpos, ypos, rlim: ((xpos**2+ypos**2)**0.5)/rlim - 1.0
+#fun=[smf.fun_hexag, fun_circ, fun_circ, fun_circ]
+
+
+R0=[0.53, 1.25, 2.0, 3.6]
+for ifun in range(4):
+    xyzpoint = [R0[ifun],0.01,0.0]
+    iel = smf.iel_point(mesh2D, xyzpoint)
+    iedge0 = 2 #still need to define function that finds iedge
+    xyzline = smf.lim_polyg(mesh2D, iel, iedge0)
+    funpar[ifun] = xyzline
+
+fun=[smf.fun_polyg, smf.fun_polyg, smf.fun_polyg, smf.fun_polyg]
+
+#n = [4]
+#imesh_high=0
+#funpar=[0.01]
+#fun_line = lambda xpos, ypos, rlim: ypos/rlim - 1.0
+#fun=[fun_line]
+
+mesh3D = msts.extrude(mesh2D, z, n, bc1, bc2, fun, funpar, imesh_high)
 #mesh3D = msts.extrude(mesh2D, z, n, bc1, bc2)
 
 
