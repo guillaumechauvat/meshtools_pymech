@@ -39,10 +39,12 @@ funpar=[0.53, 1.25, 2.0, 3.6]
 
 R0=[0.53, 1.25, 2.0, 3.6]
 for ifun in range(4):
-    xyzpoint = [R0[ifun],0.01,0.0]
-    iel = smf.iel_point(mesh2D, xyzpoint)
-    iedge0 = 2 #still need to define function that finds iedge
-    xyzline = smf.lim_polyg(mesh2D, iel, iedge0)
+    splitpoint = [R0[ifun],0.01,0.0]
+    splitpointneig = [R0[ifun],-0.01,0.0]
+    ielsplit = smf.iel_point(mesh2D, splitpoint)
+    ielsplitneig = smf.iel_point(mesh2D, splitpointneig)
+    iedge0 = smf.iface_neig(mesh2D, ielsplit, ielsplitneig)
+    xyzline = smf.lim_polyg(mesh2D, ielsplit, iedge0)
     funpar[ifun] = xyzline
 
 fun=[smf.fun_polyg, smf.fun_polyg, smf.fun_polyg, smf.fun_polyg]

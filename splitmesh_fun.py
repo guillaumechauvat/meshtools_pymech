@@ -5,7 +5,7 @@ import meshtools_split as msts
 import copy
 import matplotlib.path as mpltPath
 from numpy import pi,cos,sin,tan,arctan2
-#from math import pi,cos,sin,tan,atan2
+from pymech.log import logger
 
 def fun_circle(xpos, ypos, Rlim):
     """
@@ -127,6 +127,25 @@ def iel_point(mesh, xyzpoint):
             ifound = ifound+1
     
     return ielpoint
+
+def iface_neig(mesh, iel, ielneig):
+    """
+    Function to find which face of mesh.elem[iel] is connected to mesh.elem[ielneig]
+    ----------
+    """
+    
+    el = mesh.elem[iel]
+    ifaceneig = ''
+    
+    for iface in range(6):
+        if (el.bcs[0, iface][0] == 'E') and (ielneig == int(el.bcs[0, iface][3]-1)):
+            ifaceneig = int(el.bcs[0, iface][4]-1)
+    
+    if ifaceneig == '':
+        logger.critical('Neighboring face was not found. Elements are not neighbours or bc not equal to E')
+        return ''
+    
+    return ifaceneig
 
 def fun_hexag(xpos, ypos, Rlim):
     """
