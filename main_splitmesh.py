@@ -1,7 +1,8 @@
+import numpy as np
 import pymech.neksuite as ns
 import pymech.exadata as exa
-import meshtools_split as msts
-import splitmesh_fun as smf
+import meshtools as mst
+#import splitmesh_fun as smf
 
 path = '../examples/'
 meshI = 'in_mesh_2d.rea'
@@ -23,7 +24,7 @@ else:
 
 #Input parameters
 z = [-1.0,1.0]
-n = [32]
+n = 32
 bc1='v'
 bc2='O'
 coord = [''] # x and y positions of the leading and trailing edge
@@ -41,13 +42,13 @@ R0=[0.53, 1.25, 2.0, 3.6]
 for ifun in range(4):
     splitpoint = [R0[ifun],0.01,0.0]
     splitpointneig = [R0[ifun],-0.01,0.0]
-    ielsplit = smf.iel_point(mesh2D, splitpoint)
-    ielsplitneig = smf.iel_point(mesh2D, splitpointneig)
-    iedge0 = smf.iface_neig(mesh2D, ielsplit, ielsplitneig)
-    xyzline = smf.lim_polyg(mesh2D, ielsplit, iedge0)
+    ielsplit = mst.iel_point(mesh2D, splitpoint)
+    ielsplitneig = mst.iel_point(mesh2D, splitpointneig)
+    iedge0 = mst.iface_neig(mesh2D, ielsplit, ielsplitneig)
+    xyzline = mst.lim_polyg(mesh2D, ielsplit, iedge0)
     funpar[ifun] = xyzline
 
-fun=[smf.fun_polyg, smf.fun_polyg, smf.fun_polyg, smf.fun_polyg]
+fun=[mst.fun_polyg, mst.fun_polyg, mst.fun_polyg, mst.fun_polyg]
 
 #n = [4]
 #imesh_high=0
@@ -55,8 +56,12 @@ fun=[smf.fun_polyg, smf.fun_polyg, smf.fun_polyg, smf.fun_polyg]
 #fun_line = lambda xpos, ypos, rlim: ypos/rlim - 1.0
 #fun=[fun_line]
 
-mesh3D = msts.extrude(mesh2D, z, n, bc1, bc2, fun, funpar, imesh_high)
-#mesh3D = msts.extrude(mesh2D, z, n, bc1, bc2)
+#zlist = mst.define_z(z,n)
+zlist = mst.define_z([-1.0,1.0,0.03],32,'gpdzn')
+#zlist = mst.define_z([-1.0,1.0,0.05,1.05],21,'txt1')
+#print(zlist)
+mesh3D = mst.extrude_split(mesh2D, zlist, bc1, bc2, fun, funpar, imesh_high)
+#mesh3D = mst.extrude(mesh2D, z, n, bc1, bc2)
 
 
 
@@ -64,9 +69,9 @@ mesh3D = msts.extrude(mesh2D, z, n, bc1, bc2, fun, funpar, imesh_high)
 #ble = 10.0
 #bte = 20.0
 #dih = 10.0
-#mesh3D = msts.taper(mesh3D, ble, bte, dih, coord, z0)
-#mesh3D = msts.taper(mesh3D, ble, bte, dih)
-#mesh3D = msts.extrude_taper(mesh2D, z, n, bc1, bc2, coord, ble, bte)
+#mesh3D = mst.taper(mesh3D, ble, bte, dih, coord, z0)
+#mesh3D = mst.taper(mesh3D, ble, bte, dih)
+#mesh3D = mst.extrude_taper(mesh2D, z, n, bc1, bc2, coord, ble, bte)
 
 ns.writerea(fnameO+'.rea',mesh3D)
 ns.writere2(fnameO+'.re2',mesh3D)
