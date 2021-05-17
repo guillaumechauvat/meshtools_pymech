@@ -2,7 +2,6 @@ import numpy as np
 import pymech.neksuite as ns
 import pymech.exadata as exa
 import meshtools as mst
-#import splitmesh_fun as smf
 
 path = '../examples/'
 meshI = 'in_mesh_2d.rea'
@@ -27,16 +26,9 @@ z = [-1.0,1.0]
 n = 32
 bc1='v'
 bc2='O'
-coord = [''] # x and y positions of the leading and trailing edge
-ble = 0.0 # sweep angle (degrees) at the leading edge (positive is converging for increasing z)
-bte = 0.0 # sweep angle (degrees) at the trailing edge (positive is converging for increasing z)
 
 imesh_high=1 #index of mesh with higher discretization. Example: for imesh_high=0, the mesh with higher discretization is the most internal mesh (for for imesh_high=1, it is the second most internal mesh)
 funpar=[0.53, 1.25, 2.0, 3.6]
-
-#fun_circ = lambda xpos, ypos, rlim: ((xpos**2+ypos**2)**0.5)/rlim - 1.0
-#fun=[smf.fun_hexag, fun_circ, fun_circ, fun_circ]
-
 
 R0=[0.53, 1.25, 2.0, 3.6]
 for ifun in range(4):
@@ -49,29 +41,27 @@ for ifun in range(4):
     funpar[ifun] = xyzline
 
 fun=[mst.fun_polyg, mst.fun_polyg, mst.fun_polyg, mst.fun_polyg]
+zlist = mst.define_z(z,n)
+mesh3D = mst.extrude_split(mesh2D, zlist, bc1, bc2, fun, funpar, imesh_high)
 
-#n = [4]
+##Input parameters 2
+#z = [-1.0,1.0]
+#n = 4
+#bc1='v'
+#bc2='O'
 #imesh_high=0
 #funpar=[0.01]
 #fun_line = lambda xpos, ypos, rlim: ypos/rlim - 1.0
 #fun=[fun_line]
-
-#zlist = mst.define_z(z,n)
-zlist = mst.define_z([-1.0,1.0,0.03],32,'gpdzn')
-#zlist = mst.define_z([-1.0,1.0,0.05,1.05],21,'txt1')
-#print(zlist)
-mesh3D = mst.extrude_split(mesh2D, zlist, bc1, bc2, fun, funpar, imesh_high)
-#mesh3D = mst.extrude(mesh2D, z, n, bc1, bc2)
-
-
-
+#
+#zlist = mst.define_z([-1.0,1.0,0.03],16,'gpdzn')
+#mesh3D = mst.extrude_split(mesh2D, zlist, bc1, bc2, fun, funpar, imesh_high)
+#
 #z0=z[0]
-#ble = 10.0
-#bte = 20.0
-#dih = 10.0
-#mesh3D = mst.taper(mesh3D, ble, bte, dih, coord, z0)
+#ble = 10.0 # sweep angle (degrees) at the leading edge (positive is converging for increasing z)
+#bte = 20.0 # sweep angle (degrees) at the trailing edge (positive is converging for increasing z)
+#dih = 10.0 # dihedral angle (degrees) at the trailing edge
 #mesh3D = mst.taper(mesh3D, ble, bte, dih)
-#mesh3D = mst.extrude_taper(mesh2D, z, n, bc1, bc2, coord, ble, bte)
 
 ns.writerea(fnameO+'.rea',mesh3D)
 ns.writere2(fnameO+'.re2',mesh3D)

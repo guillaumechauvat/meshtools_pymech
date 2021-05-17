@@ -87,6 +87,15 @@ def extrude(mesh, zlist, bc1, bc2):
                 elif curv_type == 's':
                     mesh3d.elem[iel].curv[icurv][2] = z1[k]
                     mesh3d.elem[iel].curv[icurv+4][2] = z2[k]
+            
+            # update the boundary conditions for side faces
+            for ibc in range(nbc):
+                for iface in range(4):
+                    if (mesh3d.elem[iel].bcs[ibc, iface][0] == 'E' or mesh3d.elem[iel].bcs[ibc, iface][0]   == 'P'):
+                        # mesh3d.elem[iel].bcs[ibc, iface][1] ought to contain iel+1 after correction. But now, it is used to correct the neighboring element (bcs[ibc, iface][3]), that is offset for 2 reasons: 1 - if the mesh is extracted from other mesh, it may be shifted. 2 - it should be off by a factor of nel2d because it is a copy of an element in the first slice
+                        offset = mesh3d.elem[iel].bcs[ibc, iface][3]-mesh3d.elem[iel].bcs[ibc, iface][1]
+                        mesh3d.elem[iel].bcs[ibc, iface][3] = iel+1+offset
+                    mesh3d.elem[iel].bcs[ibc, iface][1] = iel+1
     
     # fix the internal boundary conditions (even though it's probably useless)
     # the end boundary conditions will be overwritten later with the proper ones
@@ -103,14 +112,6 @@ def extrude(mesh, zlist, bc1, bc2):
             el.bcs[ibc, 5][2] = 6
             el.bcs[ibc, 5][3] = iel+nel2d+1
             el.bcs[ibc, 5][4] = 5
-            # update the conditions for side faces
-            for iface in range(4):
-                el.bcs[ibc, iface][1] = iel+1
-                if (el.bcs[ibc, iface][0] == 'E'):
-                    # el.bcs[ibc, 0][1] ought to contain iel+1 once the mesh is valid
-                    # but for now it should be off by a factor of nel2d because it is a copy of an element in the first slice
-                    offset = iel-el.bcs[ibc, iface][1]+1
-                    el.bcs[ibc, iface][3] = el.bcs[ibc, iface][3]+offset
     
     # now fix the end boundary conditions
     # face 5 is at zmin and face 6 is at zmax (with Nek indexing, corresponding to 4 and 5 in Python)
@@ -663,15 +664,15 @@ def extrude_mid(mesh, zlist, bc1, bc2, fun, funpar = 0.0):
                 mesh3d.elem[iel+5].bcs[ibc, 5][3] = iel+1+nel2d
                 # update the conditions for side faces. (FIXME : Not corrected for merging - need to know numbering of other simply-extruded meshes (it is not really necessary, internal bc are not used))
                 for iface in range(4):
+                    if (mesh3d.elem[iel].bcs[ibc, iface][0] == 'E' or mesh3d.elem[iel].bcs[ibc, iface][0] == 'P'):
+                        # el.bcs[ibc, 0][1] ought to contain iel+1 once the mesh is valid
+                        # but for now it should be off by a factor of nel2d because it is a copy of an element in the first slice
+                        offset = 6*(mesh3d.elem[iel].bcs[ibc, iface][3]-mesh3d.elem[iel].bcs[ibc, iface][1])
+                        for iell in range(6):
+                            mesh3d.elem[iel+iell].bcs[ibc, iface][3] = iel+iell+1+offset
                     for iell in range(6):
                         mesh3d.elem[iel+iell].bcs[ibc, iface][1] = iel+iell+1
                         mesh3d.elem[iel+iell].bcs[ibc, iface][2] = iface+1
-                    if mesh3d.elem[iel].bcs[ibc, iface][0] == 'E':
-                        # el.bcs[ibc, 0][1] ought to contain iel+1 once the mesh is valid
-                        # but for now it should be off by a factor of nel2d because it is a copy of an element in the first slice
-                        ielneigh = 6*(mesh3d.elem[iel].bcs[ibc, iface][3]-1 + nel2d*int(k/4))
-                        for iell in range(6):
-                            mesh3d.elem[iel+iell].bcs[ibc, iface][3] = ielneigh+1+iell
                 
                 # Correct internal bc for mid faces of elements.
                 mesh3d.elem[iel].bcs[ibc, iedgehi][0] = 'E'
@@ -698,7 +699,7 @@ def extrude_mid(mesh, zlist, bc1, bc2, fun, funpar = 0.0):
                 mesh3d.elem[iel+5].bcs[ibc, iedgehi][0] = 'E'
                 mesh3d.elem[iel+5].bcs[ibc, iedgehi][3] = iel+1+4
                 mesh3d.elem[iel+5].bcs[ibc, iedgehi][4] = iedgelo+1
-                
+    
     # now fix the end boundary conditions 
     # face 5 is at zmin and face 6 is at zmax (with Nek indexing, corresponding to 4 and 5 in Python)
     for i in range(0,6*nel2d,6):
@@ -1075,9 +1076,12 @@ def iel_point(mesh, xyzpoint):
         #If both areas with oposing edges have the same sign, it is in the inside the element
         if (area[0]*area[2] > 0.0 and area[1]*area[3] > 0.0):
             ielpoint = iel
-            if ifound > 0:
-                print('Warning: point is inside more than one element.')
             ifound = ifound+1
+    
+    if ifound > 1:
+        print('Warning: point is inside more than one element.')
+    elif ifound == 0:
+        print('Warning: point not found.')
     
     return ielpoint
 
@@ -1331,6 +1335,7 @@ def merge(mesh, other, tol=1e-9, ignore_empty=True, ignore_connect=True):
     for iel in range(nel1, mesh_merg.nel):
         for ibc in range(other.nbc):
             for iface in range(6):
+                mesh_merg.elem[iel].bcs[ibc, iface][1] = iel+1
                 bc = mesh_merg.elem[iel].bcs[ibc, iface][0]
                 if bc == 'E' or bc == 'P':
                     neighbour = mesh_merg.elem[iel].bcs[ibc, iface][3]
@@ -1416,7 +1421,7 @@ def generate_internal_bcs(mesh, tol=1e-3):
     """Generates internal boundary conditions 'E' in a Nek5000 mesh based on geometric proximity of faces.
     This will loop over all pairs of faces and connect them if their centres are closer than some specified relative tolerance.
     This function returns the number of internal connections found.
-
+    
     Parameters
     ----------
     mesh : exadata
@@ -1426,7 +1431,7 @@ def generate_internal_bcs(mesh, tol=1e-3):
          the tolerance within which the centres of two faces are considered the same,
          relative to the smallest edge of the elements
     """
-
+    
     # First generate a length scale (squared) for each element, equal to the square of the smallest edge of tha element.
     scales = np.zeros((mesh.nel,))
     for (iel, (el, l2)) in enumerate(zip(mesh.elem, scales)):
@@ -1495,3 +1500,163 @@ def generate_internal_bcs(mesh, tol=1e-3):
                             other_el.bcs[ibc, other_iface][4] = iface+1
     
     return nconnect
+
+
+
+#=================================================================================
+def generate_grid(xlist, ylist, bcl = 'v', bcr = 'v', bcd = 'v', bcu = 'v'):
+    """Generates a grid-like (box-type) 2d mesh, without curvature
+    
+    Parameters
+    ----------
+    xlist : list of floats
+            list of x values of the nodes of the elements of the mesh
+    
+    ylist : list of floats
+            list of y values of the nodes of the elements of the mesh
+    
+    bc : str
+         the boundary conditions to use at the ends. [bcl, bcr, bcd, bcu] are the boundaries at [xlist[0], xlist[last], ylist[0], ylist[last]] (the name is refering to [left, right, down, up])
+    
+    Suggestion: you can use define_z to define more complex x or y positions
+    """
+    
+    # Count the number of elements and define position vectors
+    nx = len(xlist)-1
+    ny = len(ylist)-1
+    nel = nx*ny
+    
+    # Initializing data with some prescribed values
+    ndim = 2
+    lx1 = 2
+    lr1 = [ lx1, lx1, 1]
+    var = [3, 0, 0, 0, 0]  # remove anything that isn't geometry for now
+    nbc = 1
+    # Initialize data
+    mesh = exdat.exadata(ndim, nel, lr1, var, nbc)
+    mesh.ncurv = 0
+    
+    # Generating grid
+    # set the x and y locations and curvature
+    for iy in range(ny):
+        for ix in range(nx):
+            iel = iy*nx+ix
+            # replace the position arrays with 3D ones (with z empty)
+            mesh.elem[iel].pos = np.zeros((3, 1, 2, 2))
+            mesh.elem[iel].pos[0, :, :, 0] = xlist[ix]
+            mesh.elem[iel].pos[0, :, :, 1] = xlist[ix+1]
+            mesh.elem[iel].pos[1, :, 0, :] = ylist[iy]
+            mesh.elem[iel].pos[1, :, 1, :] = ylist[iy+1]
+    
+    # fix the internal boundary conditions (even though it's probably useless)
+    # the end boundary conditions will be overwritten later with the proper ones
+    for (iel, el) in enumerate(mesh.elem):
+        for ibc in range(nbc):
+            for iface in range(4):
+                el.bcs[ibc, iface][0] = 'E'
+                el.bcs[ibc, iface][1] = iel+1
+                el.bcs[ibc, iface][2] = iface+1
+            el.bcs[ibc, 0][3] = iel+1-nx
+            el.bcs[ibc, 0][4] = 3
+            el.bcs[ibc, 2][3] = iel+1+nx
+            el.bcs[ibc, 2][4] = 1
+            el.bcs[ibc, 1][3] = iel+1+1
+            el.bcs[ibc, 1][4] = 4
+            el.bcs[ibc, 3][3] = iel+1-1
+            el.bcs[ibc, 3][4] = 2
+    
+    # now fix the end boundary conditions
+    for ibc in range(nbc):
+        for iy in range(ny):
+            ix = 0
+            iel = iy*nx+ix
+            mesh.elem[iel].bcs[ibc, 3][0] = bcl
+            if bcl == 'P':
+                mesh.elem[iel].bcs[ibc, 3][3] = iel+1+(nx-1)
+                mesh.elem[iel].bcs[ibc, 3][4] = 2
+            else:
+                mesh.elem[iel].bcs[ibc, 3][3] = 0
+                mesh.elem[iel].bcs[ibc, 3][4] = 0
+            ix = nx-1
+            iel = iy*nx+ix
+            mesh.elem[iel].bcs[ibc, 1][0] = bcr
+            # fix the matching faces for the periodic conditions
+            if bcr == 'P':
+                mesh.elem[iel].bcs[ibc, 1][3] = iel+1-(nx-1)
+                mesh.elem[iel].bcs[ibc, 1][4] = 4
+            else:
+                mesh.elem[iel].bcs[ibc, 1][3] = 0
+                mesh.elem[iel].bcs[ibc, 1][4] = 0
+        for ix in range(nx):
+            iy = 0
+            iel = iy*nx+ix
+            mesh.elem[iel].bcs[ibc, 0][0] = bcd
+            if bcd == 'P':
+                mesh.elem[iel].bcs[ibc, 0][3] = iel+1+(ny-1)*nx
+                mesh.elem[iel].bcs[ibc, 0][4] = 3
+            else:
+                mesh.elem[iel].bcs[ibc, 0][3] = 0
+                mesh.elem[iel].bcs[ibc, 0][4] = 0
+            iy = ny-1
+            iel = iy*nx+ix
+            mesh.elem[iel].bcs[ibc, 2][0] = bcu
+            # fix the matching faces for the periodic conditions
+            if bcu == 'P':
+                mesh.elem[iel].bcs[ibc, 2][3] = iel+1-(ny-1)*nx
+                mesh.elem[iel].bcs[ibc, 2][4] = 1
+            else:
+                mesh.elem[iel].bcs[ibc, 2][3] = 0
+                mesh.elem[iel].bcs[ibc, 2][4] = 0
+    
+    return mesh
+
+
+
+#=================================================================================
+def curvatureto_m(mesh):
+    """Changes all the curvature 'C' to 'm'
+    
+    Parameters
+    ----------
+    mesh : exadata
+           The 3d mesh to modify in-place
+    """
+    
+    for (iel, el) in enumerate(mesh.elem):
+        # Switching position x-z of curvature 'm' and 's'
+        for icurv in range(12):
+            curv_type = el.ccurv[icurv]
+            if curv_type == 'C' or curv_type == 's':
+                el.curv[icurv][:3] = edge_mid(el, icurv)
+                el.curv[icurv][3:12] = 0.0
+                el.ccurv[icurv] = 'm'
+    
+    return
+
+
+
+#=================================================================================
+def clean_curvature(mesh, maxc):
+    """Changes all the curvature 'C' that have high radius to ''
+    
+    Parameters
+    ----------
+    mesh : exadata
+           The 3d mesh to modify in-place
+    maxc : float
+           the maximum value of curvature allowed
+    """
+    
+    for (iel, el) in enumerate(mesh.elem):
+        # Switching position x-z of curvature 'm' and 's'
+        for icurv in range(12):
+            curv_type = el.ccurv[icurv]
+            if curv_type == 'C' and abs(el.curv[icurv][0]) > maxc:
+                el.curv[icurv][:12] = 0.0
+                el.ccurv[icurv] = ''
+    
+    update_ncurv(mesh)
+    
+    return
+
+
